@@ -5,7 +5,7 @@ use tower::ServiceExt;
 use tower_kafka::connect::TcpConnection;
 use tower_kafka::error::KafkaError;
 
-use tower_kafka::{MakeService};
+use tower_kafka::MakeService;
 
 // Make sure to run kafka from docker-compose in root of project.
 #[ignore]
