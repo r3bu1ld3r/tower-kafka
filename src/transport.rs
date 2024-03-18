@@ -27,7 +27,7 @@ pub struct CorrelationStore {
     id_gen: AtomicI32,
 }
 
-const REQUEST_CORRELATION_ID_OFFSET: usize = 8;
+const REQUEST_CORRELATION_ID_OFFSET: usize = 4;
 const RESPONSE_CORRELATION_ID_OFFSET: usize = 0;
 
 impl TagStore<BytesMut, BytesMut> for CorrelationStore {
@@ -130,6 +130,12 @@ impl KafkaClientCodec {
                 .length_field_length(4)
                 .new_codec(),
         }
+    }
+}
+
+impl Default for KafkaClientCodec {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
