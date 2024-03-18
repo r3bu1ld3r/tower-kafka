@@ -2,7 +2,6 @@
 //!
 //! TODO: Add protocol level error handling.
 use crate::transport::KafkaTransportError;
-use kafka_protocol::protocol::{DecodeError, EncodeError};
 use std::fmt::{Display, Formatter};
 
 /// Errors that can occur when calling Kafka.
@@ -22,14 +21,8 @@ impl Display for KafkaError {
     }
 }
 
-impl From<DecodeError> for KafkaError {
-    fn from(_: DecodeError) -> Self {
-        KafkaError::Serde
-    }
-}
-
-impl From<EncodeError> for KafkaError {
-    fn from(_: EncodeError) -> Self {
+impl From<anyhow::Error> for KafkaError {
+    fn from(_: anyhow::Error) -> Self {
         KafkaError::Serde
     }
 }
