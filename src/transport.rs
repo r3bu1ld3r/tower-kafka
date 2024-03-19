@@ -27,6 +27,17 @@ pub struct CorrelationStore {
     id_gen: AtomicI32,
 }
 
+impl CorrelationStore {
+    
+    /// Create a new correlation store.
+    pub fn new() -> Self {
+        Self {
+            correlation_ids: HashSet::new(),
+            id_gen: AtomicI32::new(1),
+        }
+    }
+}
+
 const REQUEST_CORRELATION_ID_OFFSET: usize = 4;
 const RESPONSE_CORRELATION_ID_OFFSET: usize = 0;
 
@@ -34,18 +45,22 @@ impl TagStore<BytesMut, BytesMut> for CorrelationStore {
     type Tag = i32;
 
     fn assign_tag(self: Pin<&mut Self>, request: &mut BytesMut) -> i32 {
+        tracing::trace!(request=?request, "Assigning tag");
         let tag = self.id_gen.fetch_add(1, Ordering::SeqCst);
         request[REQUEST_CORRELATION_ID_OFFSET..REQUEST_CORRELATION_ID_OFFSET + 4]
             .copy_from_slice(&tag.to_be_bytes());
+        tracing::trace!(tag=tag, "Assigned tag");
         tag
     }
 
     fn finish_tag(mut self: Pin<&mut Self>, response: &BytesMut) -> i32 {
+        tracing::trace!(response=?response, "Finishing tag");
         let tag = i32::from_be_bytes(
             response[RESPONSE_CORRELATION_ID_OFFSET..RESPONSE_CORRELATION_ID_OFFSET + 4]
                 .try_into()
                 .unwrap(),
         );
+        tracing::trace!(tag=tag, "Finished tag");
         self.correlation_ids.remove(&tag);
         tag
     }
@@ -143,7 +158,9 @@ impl codec::Encoder<BytesMut> for KafkaClientCodec {
     type Error = io::Error;
 
     fn encode(&mut self, mut item: BytesMut, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        tracing::trace!(item=?item, "Encoding bytes");
         self.length_codec.encode(item.get_bytes(item.len()), dst)?;
+        tracing::trace!(dst=?dst, "Encoded bytes");
         Ok(())
     }
 }
@@ -153,9 +170,12 @@ impl codec::Decoder for KafkaClientCodec {
     type Error = io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        tracing::trace!(src=?src, "Decoding bytes");
         if let Some(bytes) = self.length_codec.decode(src)? {
+            tracing::trace!(bytes=?bytes, "Decoded bytes");
             Ok(Some(bytes))
         } else {
+            tracing::trace!("No bytes decoded");
             Ok(None)
         }
     }
@@ -180,7 +200,7 @@ where
         let io = self.connection.connect().await?;
         let io = Framed::new(io, KafkaClientCodec::new());
 
-        let client = Client::builder(MultiplexTransport::new(io, CorrelationStore::default()))
+        let client = Client::builder(MultiplexTransport::new(io, CorrelationStore::new()))
             .pending_store(VecDequePendingStore::default())
             .build();
 
