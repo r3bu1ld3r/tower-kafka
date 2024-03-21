@@ -101,13 +101,13 @@ pub type KafkaResponse<Res> = (ResponseHeader, Res);
 impl<Req, Svc> Service<KafkaRequest<Req>> for KafkaService<Svc>
 where
     Req: Request + Message + Encodable + HeaderVersion,
-    Svc: Service<BytesMut, Response = BytesMut>,
-    <Svc as Service<BytesMut>>::Error: Into<KafkaError>,
-    <Svc as Service<BytesMut>>::Future: 'static,
+    Svc: Service<BytesMut, Response = BytesMut> + Send,
+    <Svc as Service<BytesMut>>::Error: Into<KafkaError> + Send,
+    <Svc as Service<BytesMut>>::Future: Send + 'static,
 {
     type Response = KafkaResponse<Req::Response>;
     type Error = KafkaError;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx).map_err(|e| e.into())

@@ -7,7 +7,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::AtomicI32;
 use std::task::{Context, Poll};
 
 use crate::connect::MakeConnection;
@@ -24,7 +24,7 @@ use tower::Service;
 #[derive(Default)]
 pub struct CorrelationStore {
     correlation_ids: HashSet<i32>,
-    id_gen: AtomicI32,
+    _id_gen: AtomicI32,
 }
 
 const REQUEST_CORRELATION_ID_OFFSET: usize = 4;
@@ -214,12 +214,13 @@ impl<Svc> KafkaTransportService<Svc> {
 
 impl<Svc> Service<BytesMut> for KafkaTransportService<Svc>
 where
-    Svc: Service<BytesMut, Response = BytesMut> + 'static,
-    Svc::Error: Into<KafkaTransportError>,
+    Svc: Service<BytesMut, Response = BytesMut> + Send + 'static,
+    Svc::Error: Into<KafkaTransportError> + Send,
+    <Svc as Service<BytesMut>>::Future: Send + 'static,
 {
     type Response = Svc::Response;
     type Error = KafkaTransportError;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx).map_err(|e| e.into())
